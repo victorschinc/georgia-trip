@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Georgia 2025 — Trip Itinerary</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+
+  <style>
+    :root {
+      --burgundy: #8B1A1A;
+      --burgundy-dark: #6B1212;
+      --gold: #C9A84C;
+      --gold-light: #E2C472;
+      --terracotta: #C47A3A;
+      --teal: #1A4A4A;
+      --offwhite: #FAF7F0;
+      --cream: #F3EDE0;
+      --text-dark: #1E1208;
+      --text-mid: #4A3728;
+      --text-light: #7A6555;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: #0a0a0a;
+      color: #fff;
+    }
+    h1,h2,h3,h4 { font-family: 'Playfair Display', Georgia, serif; line-height: 1.2; }
+
+    /* ── Slide Container ── */
+    .deck {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+    }
+    .slide.active {
+      opacity: 1;
+      pointer-events: auto;
+      z-index: 10;
+    }
+
+    /* ── Overview Slide (map) ── */
+    .slide-overview {
+      display: block !important;
+      background: #0a0a0a;
+    }
+    .slide-overview .overview-header {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      z-index: 500;
+      padding: 18px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(180deg, rgba(10,10,10,0.92) 0%, rgba(10,10,10,0.6) 80%, transparent 100%);
+    }
+    .slide-overview .overview-header h1 {
+      font-size: clamp(1.4rem, 3vw, 2rem);
+      color: var(--gold);
+    }
+    .slide-overview .overview-header h1 span {
+      color: #fff;
+      font-weight: 400;
+      font-style: italic;
+      font-size: 0.7em;
+    }
+    .slide-overview .overview-header .subtitle {
+      color: rgba(255,255,255,0.6);
+      font-size: 0.85rem;
+    }
+    #overview-map {
+      position: absolute !important;
+      top: 0;
+      left: 0;
+      width: 100% !important;
+      height: 100% !important;
+    }
+    .leaflet-container {
+      background: #1a1a2e !important;
+    }
+
+    /* ── Day Slides ── */
+    .slide-day {
+      flex-direction: row;
+    }
+
+    .slide-photo {
+      flex: 1.1;
+      position: relative;
+      overflow: hidden;
+      background: #111;
+    }
+    .slide-photo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .slide-photo .photo-credit {
+      position: absolute;
+      bottom: 8px;
+      left: 12px;
+      font-size: 0.65rem;
+      color: rgba(255,255,255,0.4);
+      background: rgba(0,0,0,0.5);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .slide-content {
+      flex: 0.9;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 48px 56px;
+      background: linear-gradient(135deg, #1a1208 0%, #0e0a06 100%);
+      position: relative;
+      overflow-y: auto;
+    }
+
+    .day-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .day-number {
+      background: var(--burgundy);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.8rem;
+      padding: 6px 14px;
+      border-radius: 100px;
+      letter-spacing: 0.05em;
+    }
+    .day-date {
+      color: var(--gold);
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    .slide-content h2 {
+      font-size: clamp(1.5rem, 3vw, 2.2rem);
+      color: #fff;
+      margin-bottom: 6px;
+    }
+    .slide-content .location {
+      color: var(--gold);
+      font-size: 0.95rem;
+      font-weight: 500;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .slide-content .location svg {
+      width: 16px;
+      height: 16px;
+      fill: var(--gold);
+      flex-shrink: 0;
+    }
+
+    .travel-info {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .travel-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(201,168,76,0.12);
+      border: 1px solid rgba(201,168,76,0.25);
+      color: var(--gold-light);
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: 100px;
+    }
+    .travel-chip svg {
+      width: 14px;
+      height: 14px;
+      fill: var(--gold);
+      flex-shrink: 0;
+    }
+
+    .activities {
+      list-style: none;
+    }
+    .activities li {
+      position: relative;
+      padding-left: 20px;
+      margin-bottom: 12px;
+      color: rgba(255,255,255,0.85);
+      font-size: 0.92rem;
+      line-height: 1.55;
+    }
+    .activities li::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 9px;
+      width: 8px;
+      height: 8px;
+      background: var(--gold);
+      border-radius: 50%;
+    }
+    .activities li strong {
+      color: #fff;
+    }
+
+    .slide-content .highlight-box {
+      margin-top: 16px;
+      padding: 14px 18px;
+      background: rgba(139,26,26,0.15);
+      border-left: 3px solid var(--burgundy);
+      border-radius: 0 8px 8px 0;
+      color: rgba(255,255,255,0.8);
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .highlight-box strong {
+      color: var(--gold);
+    }
+
+    /* ── Navigation ── */
+    .nav-controls {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(10,10,10,0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(201,168,76,0.2);
+      padding: 8px 16px;
+      border-radius: 100px;
+    }
+    .nav-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.05);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 1.1rem;
+    }
+    .nav-btn:hover {
+      background: var(--burgundy);
+      border-color: var(--burgundy);
+    }
+    .nav-btn:disabled {
+      opacity: 0.3;
+      cursor: default;
+    }
+    .nav-counter {
+      color: rgba(255,255,255,0.6);
+      font-size: 0.8rem;
+      font-weight: 500;
+      min-width: 60px;
+      text-align: center;
+    }
+    .nav-dots {
+      display: flex;
+      gap: 5px;
+    }
+    .nav-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: none;
+    }
+    .nav-dot.active {
+      background: var(--gold);
+      transform: scale(1.3);
+    }
+    .nav-dot:hover {
+      background: rgba(255,255,255,0.5);
+    }
+
+    /* ── Progress bar ── */
+    .progress-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 3px;
+      background: var(--gold);
+      z-index: 100;
+      transition: width 0.4s ease;
+    }
+
+    /* ── Fullscreen button ── */
+    .fullscreen-btn {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 100;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(10,10,10,0.7);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: all 0.2s ease;
+    }
+    .fullscreen-btn:hover {
+      background: var(--burgundy);
+      border-color: var(--burgundy);
+    }
+
+    /* ── Leaflet custom markers ── */
+    .day-marker {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      background: var(--burgundy);
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      border-radius: 50%;
+      border: 3px solid #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+    .day-marker.gold {
+      background: var(--gold);
+      color: #1a1208;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 900px) {
+      .slide-day {
+        flex-direction: column;
+      }
+      .slide-photo {
+        flex: none;
+        height: 40vh;
+      }
+      .slide-content {
+        flex: 1;
+        padding: 24px 28px;
+      }
+      .slide-content h2 {
+        font-size: 1.4rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar"></div>
+
+<button class="fullscreen-btn" id="fullscreenBtn" title="Toggle fullscreen">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+  </svg>
+</button>
+
+<div class="deck" id="deck">
+
+  <!-- ═══════════════ SLIDE 0: OVERVIEW MAP ═══════════════ -->
+  <div class="slide slide-overview active" data-slide="0">
+    <div class="overview-header">
+      <h1>Georgia 2025 <span>May 23 – June 7</span></h1>
+      <div class="subtitle">16 days &bull; ~1,600 km clockwise loop &bull; Tap a marker for details</div>
+    </div>
+    <div id="overview-map"></div>
+  </div>
+
+  <!-- ═══════════════ DAY 1 ═══════════════ -->
+  <div class="slide slide-day" data-slide="1">
+    <div class="slide-photo">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/2014_Tbilisi%2C_%C5%81a%C5%BAnie_siarkowe_w_Abanotubani_%2804%29.jpg/1280px-2014_Tbilisi%2C_%C5%81a%C5%BAnie_siarkowe_w_Abanotubani_%2804%29.jpg"
+           alt="Abanotubani, Tbilisi Old Town"
+           loading="lazy" />
+      <div class="photo-credit">Abanotubani, Tbilisi &bull; Wikimedia Commons</div>
+    </div>
+    <div class="slide-content">
+      <div class="day-badge">
+        <span class="day-number">DAY 1</span>
+        <span class="day-date">Sat, May 23</span>
+      </div>
+      <h2>Arrive in Tbilisi</h2>
+      <div class="location">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Tbilisi — Old Town
+      </div>
+      <div class="travel-info">
+        <div class="travel-chip">
+          <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+          Arrival day — no driving
+        </div>
+      </div>
+      <ul class="activities">
+        <li>Arrive at Tbilisi airport, pick up rental car &amp; check into Old Town hotel</li>
+        <li><strong>Evening stroll</strong> through the narrow streets of Abanotubani — brick-domed bathhouses, carved wooden balconies, the Mtkvari river</li>
+        <li>Dinner at a traditional Old Town restaurant — try khinkali and churchkhela</li>
+      </ul>
+      <div class="highlight-box">
+        <strong>Tip:</strong> Leave the car parked at the hotel — you won't need it for the first 4 days in Tbilisi.
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ DAY 2 ═══════════════ -->
+  <div class="slide slide-day" data-slide="2">
+    <div class="slide-photo">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/Georgia_Jvari_monastery_IMG_9345_2070.jpg/1280px-Georgia_Jvari_monastery_IMG_9345_2070.jpg"
+           alt="Jvari Monastery, Mtskheta"
+           loading="lazy" />
+      <div class="photo-credit">Jvari Monastery, Mtskheta &bull; Wikimedia Commons</div>
+    </div>
+    <div class="slide-content">
+      <div class="day-badge">
+        <span class="day-number">DAY 2</span>
+        <span class="day-date">Sun, May 24</span>
+      </div>
+      <h2>Mtskheta &amp; Uplistsikhe</h2>
+      <div class="location">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Mtskheta &amp; Uplistsikhe — day trip from Tbilisi
+      </div>
+      <div class="travel-info">
+        <div class="travel-chip">
+          <svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
+          ~2.5h total driving
+        </div>
+      </div>
+      <ul class="activities">
+        <li>Drive to <strong>Mtskheta</strong> (~30 min) — Georgia's ancient capital at the confluence of two rivers</li>
+        <li><strong>Jvari Monastery</strong> (6th century) — hilltop with sweeping views where the Mtkvari and Aragvi rivers meet below</li>
+        <li><strong>Svetitskhoveli Cathedral</strong> — one of the most sacred sites in Georgia, alleged burial site of Christ's robe</li>
+        <li>Continue to <strong>Uplistsikhe</strong> (~1h) — a 3,000-year-old cave city carved into rock, with wine cellars, theatres, and a basilica</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══════════════ DAY 3 ═══════════════ -->
+  <div class="slide slide-day" data-slide="3">
+    <div class="slide-photo">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Tbilisi_IMG_8846_1920.jpg/1280px-Tbilisi_IMG_8846_1920.jpg"
+           alt="Narikala Fortress overlooking Tbilisi"
+           loading="lazy" />
+      <div class="photo-credit">Narikala Fortress, Tbilisi &bull; Wikimedia Commons</div>
+    </div>
+    <div class="slide-content">
+      <div class="day-badge">
+        <span class="day-number">DAY 3</span>
+        <span class="day-date">Mon, May 25</span>
+      </div>
+      <h2>Tbilisi Deep Dive</h2>
+      <div class="location">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Tbilisi — Old Town &amp; city centre
+      </div>
+      <div class="travel-info">
+        <div class="travel-chip">
+          <svg viewBox="0 0 24 24"><path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/></svg>
+          Walking day — no driving
+        </div>
+      </div>
+      <ul class="activities">
+        <li>Climb to <strong>Narikala Fortress</strong> for the best panoramic view of the city — Old Town rooftops, the river, and mountains beyond</li>
+        <li>Book a private room at <strong>Chreli Abano</strong> for a traditional sulfur bath — one of Tbilisi's most unique experiences</li>
+        <li>Browse the <strong>Dry Bridge Market</strong> — Soviet-era curiosities, antiques, paintings, and memorabilia spread across a bridge</li>
+        <li>Pre-Independence Day buzz building across the city — enjoy the atmosphere</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══════════════ DAY 4 ═══════════════ -->
+  <div class="slide slide-day" data-slide="4">
+    <div class="slide-photo">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/27/Rustaveli_theatre.jpg/1280px-Rustaveli_theatre.jpg"
+           alt="Rustaveli Avenue, Tbilisi"
+           loading="lazy" />
+      <div class="photo-credit">Rustaveli Avenue, Tbilisi &bull; Wikimedia Commons</div>
+    </div>
+    <div class="slide-content">
+      <div class="day-badge">
+        <span class="day-number">DAY 4</span>
+        <span class="day-date">Tue, May 26</span>
+      </div>
+      <h2>Independence Day</h2>
+      <div class="location">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Tbilisi — Rustaveli Avenue &amp; Rike Park
+      </div>
+      <div class="travel-info">
+        <div class="travel-chip">
+          <svg viewBox="0 0 24 24"><path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z"/></svg>
+          No driving — city on foot
+        </div>
+      </div>
+      <ul class="activities">
+        <li><strong>Military parade</strong> along Rustaveli Avenue from ~10 AM — troops, armoured vehicles, aircraft flypasts</li>
+        <li><strong>Rike Park</strong> fills with open-air concerts, folk dancing, and food stalls throughout the afternoon</li>
+        <li><strong>Fireworks</strong> in the evening — best viewed from near Metekhi Church or Rike Park</li>
+      </ul>
+      <div class="highlight-box">
+        <strong>May 26:</strong> Georgia's most important national holiday, celebrating independence declared in 1918. Warm, festive, and proudly celebrated. Most of Old Town will be pedestrianized.
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ DAY 5 ═══════════════ -->
+  <div class="slide slide-day" data-slide="5">
+    <div class="slide-photo">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Akhalcikhe%2C_old_city_general_view.jpg/1280px-Akhalcikhe%2C_old_city_general_view.jpg"
+           alt="Rabati Castle, Akhaltsikhe"
+           loading="lazy" />
+      <div class="photo-credit">Rabati Castle, Akhaltsikhe &bull; Wikimedia Commons</div>
+    </div>
+    <div class="slide-content">
+      <div class="day-badge">
+        <span class="day-number">DAY 5</span>
+        <span class="day-date">Wed, May 27</span>
+      </div>
+      <h2>Road Trip Begins: Rabati &amp; Vardzia</h2>
+      <div class="location">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Tbilisi &rarr; Akhaltsikhe &rarr; Vardzia
+      </div>
+      <div class="travel-info">
+        <div class="travel-chip">
+          <svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
+          ~5h driving (with stops)
+        </div>
+      </div>
+      <ul class="activities">
+        <li>Drive southwest through the heartland — dramatic mountain scenery unfolds</li>
+        <li><strong>Rabati Castle</strong> in Akhaltsikhe — lunch &amp; 2-hour explore of the fortress blending Orthodox and Islamic architecture</li>
+        <li>Quick stop at <strong>Khertvisi Fortress</strong> — dramatic roadside medieval castle above a gorge</li>
+        <li>Arrive at <strong>Vardzia</strong> area by early evening</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══════════════ DAY 6 ═══════════════ -->
+  <div class="slide slide-day" data-slide="6">
+    <div class="slide-photo">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/Vardzia_Cave_Monastery_05.jpg/1280px-Vardzia_Cave_Monastery_05.jpg"
+           alt="Vardzia cave city"
+           loading="lazy" />
+      <div class="photo-credit">Vardzia Cave City &bull; Wikimedia Commons</div>
+    </div>
+    <div class="slide-content">
+      <div class="day-badge">
+        <span class="day-number">DAY 6</span>
+        <span class="day-date">Thu, May 28</span>
+      </div>
+      <h2>Vardzia Cave City</h2>
+      <div class="location">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Vardzia — Samtskhe-Javakheti
+      </div>
+      <div class="travel-info">
+        <div class="travel-chip">
+          <svg viewBox="0 0 24 24"><path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/></svg>
+          Exploration day — minimal driving
+        </div>
+      </div>
+      <ul class="activities">
+        <li>Full morning exploring <strong>Vardzia</strong> — 640 surviving cave dwellings carved into a sheer cliff face</li>
+        <li>12th-century <strong>frescoed cave church</strong> with original paintings still visible inside</li>
+        <li>Walk through tunnels and stairways connecting multiple levels — extraordinary cliffside views</li>
+        <li>Afternoon relaxing by the river below the caves</li>
+      </ul>
+      <div class="highlight-box">
+        <strong>Book ahead:</strong> Accommodation near Vardzia is very limited. Reserve early.
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ DAY 7 ═══════════════ -->
+  <div class="slide slide-day" data-slide="7">
+    <div class="slide-photo">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/81/USS_Oak_Hill%2C_26th_MEU_Marines_Visit_Batumi%2C_Georgia_%2840817303032%29.jpg/1280px-USS_Oak_Hill%2C_26th_MEU_Marines_Visit_Batumi%2C_Georgia_%2840817303032%29.jpg"
+           alt="Batumi, Black Sea coast"
+           loading="lazy" />
+      <div class="photo-credit">Batumi, Black Sea &bull; Wikimedia Commons</div>
+    </div>
+    <div class="slide-content">
+      <div class="day-badge">
+        <span class="day-number">DAY 7</span>
+        <span class="day-date">Fri, May 29</span>
+      </div>
+      <h2>Vardzia to Batumi</h2>
+      <div class="location">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Vardzia &rarr; Batumi (Black Sea)
+      </div>
+      <div class="travel-info">
+        <div class="travel-chip">
+          <svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
+          ~2.5h driving
+        </div>
+      </div>
+      <ul class="activities">
+        <li>Easy drive west to the <strong>Black Sea coast</strong> — landscape shifts from mountains to subtropical</li>
+        <li>Arrive in <strong>Batumi</strong> — a lively resort city with palm-lined boulevards, eclectic architecture, and a fun energy</li>
+        <li>Afternoon on the <strong>seafront promenade</strong> — cafes, sculptures, sea breeze</li>
+        <li>Settle into the hotel and enjoy a first evening by the sea</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══════════════ DAY 8 ═══════════════ -->
+  <div class="slide slide-day" data-slide="8">
+    <div class="slide-photo">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Batumi%2C_Georgia_%E2%80%94_Botanical_Garden.jpg/1280px-Batumi%2C_Georgia_%E2%80%94_Botanical_Garden.jpg"
+           alt="Batumi Botanical Garden"
+           loading="lazy" />
+      <div class="photo-credit">Batumi Botanical Garden &bull; Wikimedia Commons</div>
+    </div>
+    <div class="slide-content">
+      <div class="day-badge">
+        <span class="day-number">DAY 8</span>
+        <span class="day-date">Sat, May 30</span>
+      </div>
+      <h2>Full Day in Batumi</h2>
+      <div class="location">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Batumi — Black Sea coast
+      </div>
+      <div class="travel-info">
+        <div class="travel-chip">
+          <svg viewBox="0 0 24 24"><path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/></svg>
+          Beach day — no driving
+        </div>
+      </div>
+      <ul class="activities">
+        <li>Morning at the <strong>Batumi Botanical Garden</strong> — one of the best in the region, with sweeping sea views and subtropical plants</li>
+        <li>Afternoon <strong>swimming</strong> in the Black Sea — your only real beach day on the whole trip</li>
+        <li>Explore the eclectic <strong>Old Town architecture</strong> — mix of Art Nouveau, Ottoman, and Soviet</li>
+        <li>Proper <strong>seafood dinner</strong> in the evening</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══════════════ DAY 9 ═══════════════ -->
+  <div class="slide slide-day" data-slide="9">
+    <div class="slide-photo">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/Gold_of_Svaneti.jpg/1280px-Gold_of_Svaneti.jpg"
+           alt="Mestia with Svan towers, Svaneti"
+           loading="lazy" />
+      <div class="photo-credit">Mestia &amp; Svan Towers, Svaneti &bull; Wikimedia Commons</div>
+    </div>
+    <div class="slide-content">
+      <div class="day-badge">
+        <span class="day-number">DAY 9</span>
+        <span class="day-date">Sun, May 31</span>
+      </div>
+      <h2>Into the Mountains: Svaneti</h2>
+      <div class="location">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Batumi &rarr; Mestia (Svaneti)
+      </div>
+      <div class="travel-info">
+        <div class="travel-chip">
+          <svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
+          ~3.5–4h driving
+        </div>
+      </div>
+      <ul class="activities">
+        <li>Drive north via Zugdidi — the last 60km to Mestia is on a slow mountain road where the 4x4 earns its keep</li>
+        <li>Arrive in <strong>Mestia</strong> — medieval defensive towers scattered across hillsides, snow-capped peaks all around</li>
+        <li>Noticeably cooler air than the coast — a different world</li>
+        <li>Settle in and explore the village on foot</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══════════════ DAY 10 ═══════════════ -->
+  <div class="slide slide-day" data-slide="10">
+    <div class="slide-photo">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Near_Mestia%2C_Svan_towers_%2835252565354%29.jpg/1280px-Near_Mestia%2C_Svan_towers_%2835252565354%29.jpg"
+           alt="Svan towers near Mestia"
+           loading="lazy" />
+      <div class="photo-credit">Svan Towers, Mestia &bull; Wikimedia Commons</div>
+    </div>
+    <div class="slide-content">
+      <div class="day-badge">
+        <span class="day-number">DAY 10</span>
+        <span class="day-date">Mon, June 1</span>
+      </div>
+      <h2>Mestia: Museum &amp; Glacier Hike</h2>
+      <div class="location">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Mestia, Svaneti
+      </div>
+      <div class="travel-info">
+        <div class="travel-chip">
+          <svg viewBox="0 0 24 24"><path d="M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7"/></svg>
+          Hiking day — minimal driving
+        </div>
+      </div>
+      <ul class="activities">
+        <li>Visit the <strong>Svaneti Museum of History and Ethnography</strong> — understand the extraordinary isolated culture of this region</li>
+        <li>Hike to <strong>Chalaadi Glacier</strong> — flat, easy 5km trail through forest ending at the snout of an active glacier</li>
+        <li>Good acclimatization before the more demanding Ushguli day tomorrow</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══════════════ DAY 11 ═══════════════ -->
+  <div class="slide slide-day" data-slide="11">
+    <div class="slide-photo">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Ushguli_Svaneti_Georgia.JPG/1280px-Ushguli_Svaneti_Georgia.JPG"
+           alt="Ushguli with Mt. Shkhara"
+           loading="lazy" />
+      <div class="photo-credit">Ushguli &amp; Mt. Shkhara &bull; Wikimedia Commons</div>
+    </div>
+    <div class="slide-content">
+      <div class="day-badge">
+        <span class="day-number">DAY 11</span>
+        <span class="day-date">Tue, June 2</span>
+      </div>
+      <h2>Ushguli — Europe's Highest Village</h2>
+      <div class="location">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Mestia &rarr; Ushguli &rarr; Mestia (day trip)
+      </div>
+      <div class="travel-info">
+        <div class="travel-chip">
+          <svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
+          ~3–4h driving (rough mountain road)
+        </div>
+      </div>
+      <ul class="activities">
+        <li><strong>Ushguli</strong> at 2,200m — one of the highest continuously inhabited settlements in Europe</li>
+        <li>Cluster of medieval <strong>Svan towers</strong> against the backdrop of <strong>Mt. Shkhara</strong> (Georgia's highest peak, 5,193m)</li>
+        <li>Road takes 1.5–2h each way — <strong>4x4 mandatory</strong>, not optional</li>
+        <li>Spend 4–5 hours wandering freely — one of the trip's absolute highlights</li>
+      </ul>
+      <div class="highlight-box">
+        <strong>4x4 required:</strong> The Ushguli road is rough and unpaved. Do not attempt in a standard car.
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ DAY 12 ═══════════════ -->
+  <div class="slide slide-day" data-slide="12">
+    <div class="slide-photo">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Gelati_Monastery_1.jpg/1280px-Gelati_Monastery_1.jpg"
+           alt="Gelati Monastery, Kutaisi"
+           loading="lazy" />
+      <div class="photo-credit">Gelati Monastery, Kutaisi &bull; Wikimedia Commons</div>
+    </div>
+    <div class="slide-content">
+      <div class="day-badge">
+        <span class="day-number">DAY 12</span>
+        <span class="day-date">Wed, June 3</span>
+      </div>
+      <h2>Svaneti &rarr; Kutaisi &rarr; Tbilisi</h2>
+      <div class="location">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Mestia &rarr; Kutaisi &rarr; Tbilisi
+      </div>
+      <div class="travel-info">
+        <div class="travel-chip">
+          <svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
+          ~6.5h driving (longest day)
+        </div>
+      </div>
+      <ul class="activities">
+        <li>Leave Mestia by 8 AM for the long transit day</li>
+        <li>Stop in Kutaisi for <strong>Gelati Monastery</strong> — 12th-century UNESCO site built by King David the Builder</li>
+        <li>Stunning <strong>mosaics</strong> and hilltop setting above a forested valley</li>
+        <li>Push on to <strong>Tbilisi</strong> (~3h from Kutaisi) — evening rest before the northern leg</li>
+      </ul>
+      <div class="highlight-box">
+        <strong>Longest drive:</strong> ~6.5h total. Leave early and break it up with the Gelati stop.
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ DAY 13 ═══════════════ -->
+  <div class="slide slide-day" data-slide="13">
+    <div class="slide-photo">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Gergeti_Trinity_Church_09.23.jpg/1280px-Gergeti_Trinity_Church_09.23.jpg"
+           alt="Gergeti Trinity Church with Mt. Kazbegi"
+           loading="lazy" />
+      <div class="photo-credit">Gergeti Trinity Church &amp; Mt. Kazbek &bull; Wikimedia Commons</div>
+    </div>
+    <div class="slide-content">
+      <div class="day-badge">
+        <span class="day-number">DAY 13</span>
+        <span class="day-date">Thu, June 4</span>
+      </div>
+      <h2>The Military Highway to Kazbegi</h2>
+      <div class="location">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Tbilisi &rarr; Ananuri &rarr; Kazbegi (Stepantsminda)
+      </div>
+      <div class="travel-info">
+        <div class="travel-chip">
+          <svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
+          ~3h driving (with stops)
+        </div>
+      </div>
+      <ul class="activities">
+        <li>Head north on the legendary <strong>Georgian Military Highway</strong></li>
+        <li>Stop at <strong>Ananuri Fortress</strong> perched above the Zhinvali Reservoir (1h)</li>
+        <li><strong>Gudauri panoramic viewpoint</strong> — dramatic mountain pass views</li>
+        <li>Drive up to <strong>Gergeti Trinity Church</strong> — 14th-century monastery at 2,170m with Mt. Kazbegi rising behind</li>
+      </ul>
+      <div class="highlight-box">
+        <strong>Golden hour:</strong> Afternoon light at Gergeti is exceptional — plan to arrive by 3–4 PM.
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ DAY 14 ═══════════════ -->
+  <div class="slide slide-day" data-slide="14">
+    <div class="slide-photo">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Darial_Gorge%2C_Terek_River%2C_Georgia.jpg/1280px-Darial_Gorge%2C_Terek_River%2C_Georgia.jpg"
+           alt="Dariali Gorge, Kazbegi"
+           loading="lazy" />
+      <div class="photo-credit">Dariali Gorge &bull; Wikimedia Commons</div>
+    </div>
+    <div class="slide-content">
+      <div class="day-badge">
+        <span class="day-number">DAY 14</span>
+        <span class="day-date">Fri, June 5</span>
+      </div>
+      <h2>Kazbegi: Truso Gorge &amp; Dariali</h2>
+      <div class="location">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Kazbegi — Stepantsminda area
+      </div>
+      <div class="travel-info">
+        <div class="travel-chip">
+          <svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
+          ~2h driving (mountain roads)
+        </div>
+      </div>
+      <ul class="activities">
+        <li><strong>Dariali Monastery</strong> right on the Russian border — framed by near-vertical cliff walls, one of the most dramatic settings in Georgia</li>
+        <li><strong>Truso Gorge</strong> (4x4 required) — broad mountain valley with mineral hot springs and free-roaming horses</li>
+        <li>Ruins of <strong>Zakagori Fortress</strong> at the end of the valley</li>
+        <li>Alternative: Gergeti glacier day-hike for more mountain time</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══════════════ DAY 15 ═══════════════ -->
+  <div class="slide slide-day" data-slide="15">
+    <div class="slide-photo">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Quevri%2C_Nationalmuseum_Tiflis.jpg/1280px-Quevri%2C_Nationalmuseum_Tiflis.jpg"
+           alt="Qvevri — traditional Georgian wine vessels"
+           loading="lazy" />
+      <div class="photo-credit">Qvevri (Clay Wine Vessels) &bull; Wikimedia Commons</div>
+    </div>
+    <div class="slide-content">
+      <div class="day-badge">
+        <span class="day-number">DAY 15</span>
+        <span class="day-date">Sat, June 6</span>
+      </div>
+      <h2>Kakheti Wine Country</h2>
+      <div class="location">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Kazbegi &rarr; Kakheti (via Tbilisi)
+      </div>
+      <div class="travel-info">
+        <div class="travel-chip">
+          <svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
+          ~3.5h driving
+        </div>
+      </div>
+      <ul class="activities">
+        <li>Drive south through Tbilisi and east into <strong>Kakheti</strong> — Georgia's premier wine region</li>
+        <li>Afternoon <strong>wine tasting</strong> at a winery near Telavi — look for traditional <strong>qvevri</strong> (underground clay vessel) winemaking</li>
+        <li>Georgia's 8,000-year winemaking tradition is UNESCO-listed — taste it at the source</li>
+        <li>Night in <strong>Telavi</strong> or <strong>Sighnaghi</strong></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══════════════ DAY 16 ═══════════════ -->
+  <div class="slide slide-day" data-slide="16">
+    <div class="slide-photo">
+      <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/Sighnagi_2009.jpg/1280px-Sighnagi_2009.jpg"
+           alt="Sighnaghi, City of Love"
+           loading="lazy" />
+      <div class="photo-credit">Sighnaghi, Kakheti &bull; Wikimedia Commons</div>
+    </div>
+    <div class="slide-content">
+      <div class="day-badge">
+        <span class="day-number">DAY 16</span>
+        <span class="day-date">Sun, June 7</span>
+      </div>
+      <h2>Sighnaghi &amp; Departure</h2>
+      <div class="location">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Sighnaghi &rarr; Tbilisi Airport
+      </div>
+      <div class="travel-info">
+        <div class="travel-chip">
+          <svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
+          ~2h driving to airport
+        </div>
+      </div>
+      <ul class="activities">
+        <li>Final morning in <strong>Sighnaghi</strong> — Georgia's prettiest walled village perched on a hill overlooking the Alazani Valley</li>
+        <li>Walk the <strong>cobblestone streets</strong> and old city walls for one last view</li>
+        <li>One last <strong>wine stop</strong> before the road</li>
+        <li>2h drive back to <strong>Tbilisi airport</strong> — return car &amp; depart</li>
+      </ul>
+      <div class="highlight-box">
+        <strong>Final count:</strong> 16 days, ~1,600 km, one clean clockwise loop through the heart of Georgia.
+      </div>
+    </div>
+  </div>
+
+</div><!-- /deck -->
+
+<!-- ── Navigation controls ── -->
+<div class="nav-controls">
+  <button class="nav-btn" id="prevBtn">&#8592;</button>
+  <div class="nav-dots" id="navDots"></div>
+  <span class="nav-counter" id="navCounter">1 / 17</span>
+  <button class="nav-btn" id="nextBtn">&#8594;</button>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+<script>
+(function() {
+  'use strict';
+
+  /* ── Forward declarations (needed before goTo runs) ── */
+  var map = null, bounds = null;
+
+  /* ── Slide engine ── */
+  const slides = document.querySelectorAll('.slide');
+  const total = slides.length;
+  let current = 0;
+
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const counter = document.getElementById('navCounter');
+  const dotsEl  = document.getElementById('navDots');
+  const progress = document.getElementById('progressBar');
+
+  // Build dots
+  for (let i = 0; i < total; i++) {
+    const dot = document.createElement('button');
+    dot.className = 'nav-dot' + (i === 0 ? ' active' : '');
+    dot.title = i === 0 ? 'Overview Map' : `Day ${i}`;
+    dot.addEventListener('click', () => goTo(i));
+    dotsEl.appendChild(dot);
+  }
+
+  function goTo(n) {
+    if (n < 0 || n >= total) return;
+    slides[current].classList.remove('active');
+    dotsEl.children[current].classList.remove('active');
+    current = n;
+    slides[current].classList.add('active');
+    dotsEl.children[current].classList.add('active');
+    counter.textContent = (current === 0 ? 'Overview' : `Day ${current}`) + ` / ${total - 1} days`;
+    prevBtn.disabled = current === 0;
+    nextBtn.disabled = current === total - 1;
+    progress.style.width = ((current / (total - 1)) * 100) + '%';
+
+    // Invalidate map size when overview shown
+    if (current === 0 && map) {
+      setTimeout(function() {
+        map.invalidateSize();
+        if (bounds) map.fitBounds(bounds, { padding: [40, 40] });
+      }, 150);
+    }
+  }
+
+  prevBtn.addEventListener('click', () => goTo(current - 1));
+  nextBtn.addEventListener('click', () => goTo(current + 1));
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); goTo(current + 1); }
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); goTo(current - 1); }
+    if (e.key === 'Home') { e.preventDefault(); goTo(0); }
+    if (e.key === 'End') { e.preventDefault(); goTo(total - 1); }
+    if (e.key === 'f' || e.key === 'F') toggleFullscreen();
+  });
+
+  // Touch/swipe
+  let touchX = 0;
+  document.addEventListener('touchstart', e => { touchX = e.changedTouches[0].screenX; });
+  document.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].screenX - touchX;
+    if (Math.abs(dx) > 50) {
+      dx < 0 ? goTo(current + 1) : goTo(current - 1);
+    }
+  });
+
+  // Fullscreen
+  const fsBtn = document.getElementById('fullscreenBtn');
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen();
+    }
+  }
+  fsBtn.addEventListener('click', toggleFullscreen);
+
+  // Init
+  goTo(0);
+
+  /* ── Overview Map ── */
+  const dayLocations = [
+    { day: 1,  lat: 41.6934, lng: 44.8015, label: "Tbilisi",          note: "Arrive & explore Old Town" },
+    { day: 2,  lat: 41.8427, lng: 44.7221, label: "Mtskheta",         note: "Jvari Monastery & Uplistsikhe" },
+    { day: 3,  lat: 41.6934, lng: 44.8015, label: "Tbilisi",          note: "Narikala, Sulfur Baths, Dry Bridge" },
+    { day: 4,  lat: 41.7010, lng: 44.7930, label: "Tbilisi",          note: "Independence Day celebrations" },
+    { day: 5,  lat: 41.5790, lng: 43.2830, label: "Akhaltsikhe",      note: "Rabati Castle → Vardzia" },
+    { day: 6,  lat: 41.3812, lng: 43.2845, label: "Vardzia",          note: "Cave city exploration" },
+    { day: 7,  lat: 41.6458, lng: 41.6419, label: "Batumi",           note: "Black Sea arrival" },
+    { day: 8,  lat: 41.6458, lng: 41.6419, label: "Batumi",           note: "Botanical Garden & beach" },
+    { day: 9,  lat: 43.0090, lng: 42.7280, label: "Mestia",           note: "Into the Svaneti mountains" },
+    { day: 10, lat: 43.0090, lng: 42.7280, label: "Mestia",           note: "Museum & Chalaadi Glacier" },
+    { day: 11, lat: 42.9160, lng: 42.9935, label: "Ushguli",          note: "Europe's highest village" },
+    { day: 12, lat: 42.2660, lng: 42.6980, label: "Kutaisi",          note: "Gelati Monastery → Tbilisi" },
+    { day: 13, lat: 42.6616, lng: 44.5820, label: "Kazbegi",          note: "Military Highway & Gergeti" },
+    { day: 14, lat: 42.6616, lng: 44.5820, label: "Kazbegi",          note: "Truso Gorge & Dariali" },
+    { day: 15, lat: 41.9196, lng: 45.4710, label: "Telavi / Kakheti", note: "Wine tasting" },
+    { day: 16, lat: 41.6170, lng: 45.9220, label: "Sighnaghi",        note: "Farewell & departure" }
+  ];
+
+  // Ensure the map container has real pixel dimensions before Leaflet init
+  const mapEl = document.getElementById('overview-map');
+  const rect = mapEl.getBoundingClientRect();
+  console.log('[slides] Map container size at init:', rect.width, 'x', rect.height);
+
+  // If container has no height, force it
+  if (rect.height < 10) {
+    mapEl.style.height = window.innerHeight + 'px';
+    console.log('[slides] Forced map height to', window.innerHeight);
+  }
+
+  try {
+    map = L.map('overview-map', {
+      center: [42.2, 43.6],
+      zoom: 7,
+      zoomControl: true,
+      attributionControl: true
+    });
+
+    // Try CartoDB Voyager first (clean cartographic style)
+    const cartoLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 19
+    });
+
+    // OSM fallback
+    const osmLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19
+    });
+
+    // Try CartoDB first; if tiles fail to load, swap to OSM
+    let tileErrors = 0;
+    cartoLayer.on('tileerror', function() {
+      tileErrors++;
+      if (tileErrors > 3) {
+        console.log('[slides] CartoDB tiles failing, switching to OSM');
+        map.removeLayer(cartoLayer);
+        osmLayer.addTo(map);
+      }
+    });
+    cartoLayer.addTo(map);
+
+    console.log('[slides] Map created OK');
+
+    // Route polyline
+    const routeCoords = [
+      [41.6934, 44.8015], // Tbilisi
+      [41.8427, 44.7221], // Mtskheta
+      [41.6934, 44.8015], // Tbilisi
+      [41.5790, 43.2830], // Akhaltsikhe
+      [41.3812, 43.2845], // Vardzia
+      [41.6458, 41.6419], // Batumi
+      [43.0090, 42.7280], // Mestia
+      [42.9160, 42.9935], // Ushguli
+      [43.0090, 42.7280], // Mestia back
+      [42.2660, 42.6980], // Kutaisi
+      [41.6934, 44.8015], // Tbilisi
+      [42.6616, 44.5820], // Kazbegi
+      [41.6934, 44.8015], // Tbilisi
+      [41.9196, 45.4710], // Telavi
+      [41.6170, 45.9220], // Sighnaghi
+      [41.6934, 44.8015], // Tbilisi
+    ];
+
+    L.polyline(routeCoords, {
+      color: '#8B1A1A',
+      weight: 3,
+      opacity: 0.6,
+      dashArray: '8,6',
+      smoothFactor: 1.5
+    }).addTo(map);
+
+    // Day markers — offset overlapping locations slightly
+    const placed = {};
+    dayLocations.forEach(d => {
+      let lat = d.lat, lng = d.lng;
+      const key = `${lat},${lng}`;
+      if (placed[key]) {
+        const n = placed[key];
+        lat += (n % 2 === 0 ? 0.03 : -0.03) * Math.ceil(n / 2);
+        lng += (n % 2 === 0 ? 0.04 : -0.04) * Math.ceil(n / 2);
+        placed[key]++;
+      } else {
+        placed[key] = 1;
+      }
+
+      const icon = L.divIcon({
+        className: '',
+        html: '<div class="day-marker">' + d.day + '</div>',
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+      });
+
+      const marker = L.marker([lat, lng], { icon: icon }).addTo(map);
+      marker.bindPopup(
+        '<div style="font-family:Inter,sans-serif;min-width:160px">' +
+        '<strong style="font-size:14px;color:#8B1A1A">Day ' + d.day + '</strong><br>' +
+        '<span style="font-size:13px;font-weight:600">' + d.label + '</span><br>' +
+        '<span style="font-size:12px;color:#666">' + d.note + '</span></div>',
+        { closeButton: false }
+      );
+
+      marker.on('click', function() { goTo(d.day); });
+    });
+
+    // Fit bounds with padding
+    bounds = L.latLngBounds(dayLocations.map(function(d) { return [d.lat, d.lng]; }));
+
+    // Use whenReady to ensure the map container is fully sized
+    map.whenReady(function() {
+      console.log('[slides] Map ready — invalidating size and fitting bounds');
+      map.invalidateSize();
+      map.fitBounds(bounds, { padding: [40, 40] });
+    });
+
+    // Belt-and-suspenders: also retry after layout paints
+    setTimeout(function() { map.invalidateSize(); map.fitBounds(bounds, { padding: [40, 40] }); }, 300);
+    setTimeout(function() { map.invalidateSize(); map.fitBounds(bounds, { padding: [40, 40] }); }, 1000);
+
+    console.log('[slides] All markers added');
+
+  } catch(e) {
+    console.error('[slides] Map init error:', e);
+    mapEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#C9A84C;font-size:1.2rem;">Map failed to load — check console (F12)</div>';
+  }
+
+  // Handle image loading errors — try fallback
+  document.querySelectorAll('.slide-photo img').forEach(img => {
+    img.addEventListener('error', function() {
+      // Show a gradient placeholder on error
+      this.style.display = 'none';
+      this.parentElement.style.background = 'linear-gradient(135deg, #1a4a4a, #8B1A1A)';
+    });
+  });
+
+})();
+</script>
+
+</body>
+</html>

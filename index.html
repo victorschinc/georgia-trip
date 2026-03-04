@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Georgia Trip Planner — Caucasus 2-Week Itineraries</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400;1,600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Leaflet CSS (no integrity hash — avoids silent block on file://) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    /* ============================================================
+       CSS CUSTOM PROPERTIES
+    ============================================================ */
+    :root {
+      --burgundy:        #8B1A1A;
+      --burgundy-dark:   #6B1212;
+      --burgundy-light:  #B52424;
+      --gold:            #C9A84C;
+      --gold-light:      #E2C472;
+      --gold-pale:       #F5EDD0;
+      --terracotta:      #C47A3A;
+      --teal:            #1A4A4A;
+      --teal-light:      #245F5F;
+      --teal-pale:       #E0EEEE;
+      --offwhite:        #FAF7F0;
+      --cream:           #F3EDE0;
+      --text-dark:       #1E1208;
+      --text-mid:        #4A3728;
+      --text-light:      #7A6555;
+      --shadow-sm:  0 2px 8px rgba(30,18,8,0.08);
+      --shadow-md:  0 6px 24px rgba(30,18,8,0.12);
+      --shadow-lg:  0 16px 48px rgba(30,18,8,0.16);
+      --radius-sm:  6px;
+      --radius-md:  12px;
+      --radius-lg:  20px;
+      --transition: 0.25s ease;
+    }
+
+    /* ============================================================
+       RESET & BASE
+    ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--offwhite);
+      color: var(--text-dark);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+    h1,h2,h3,h4 { font-family: 'Playfair Display', Georgia, serif; line-height: 1.25; }
+    a { color: inherit; text-decoration: none; }
+    img { display: block; max-width: 100%; }
+    ul { list-style: none; }
+    button { cursor: pointer; font-family: inherit; border: none; background: none; }
+
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: var(--cream); }
+    ::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 4px; }
+
+    /* ============================================================
+       UTILITIES
+    ============================================================ */
+    .container { max-width: 1240px; margin: 0 auto; padding: 0 24px; }
+    .section-title { font-size: clamp(1.75rem, 3vw, 2.5rem); color: var(--burgundy); margin-bottom: 8px; }
+    .section-subtitle { font-size: 1.05rem; color: var(--text-light); font-style: italic; }
+    .badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 100px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+    .badge-easy { background: #D6EFDC; color: #1A6630; }
+    .badge-hard { background: #FDDEC8; color: #8B3A00; }
+
+    /* ============================================================
+       NAVIGATION
+    ============================================================ */
+    .nav {
+      position: sticky; top: 0; z-index: 1000;
+      background: rgba(26,18,8,0.97);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(201,168,76,0.3);
+    }
+    .nav-inner {
+      max-width: 1240px; margin: 0 auto; padding: 0 24px;
+      display: flex; align-items: center; justify-content: space-between; height: 60px;
+    }
+    .nav-logo { font-family: 'Playfair Display', serif; font-size: 1.2rem; color: var(--gold); font-weight: 700; }
+    .nav-logo span { color: #fff; font-weight: 400; font-style: italic; }
+    .nav-links { display: flex; gap: 4px; }
+    .nav-link { color: rgba(255,255,255,0.7); font-size: 0.85rem; font-weight: 500; padding: 6px 14px; border-radius: var(--radius-sm); transition: color var(--transition), background var(--transition); }
+    .nav-link:hover { color: var(--gold); background: rgba(201,168,76,0.1); }
+    @media (max-width: 640px) { .nav-links { display: none; } }
+
+    /* ============================================================
+       HERO
+    ============================================================ */
+    .hero {
+      position: relative; min-height: 88vh;
+      display: flex; align-items: center; justify-content: center; text-align: center;
+      overflow: hidden; background: var(--teal);
+    }
+    .hero-bg {
+      position: absolute; inset: 0;
+      background-image: linear-gradient(to bottom, rgba(26,18,8,0.6) 0%, rgba(139,26,26,0.6) 50%, rgba(26,18,8,0.9) 100%);
+      background-size: cover; background-position: center 40%;
+      transform: scale(1.04); transition: transform 8s ease, background-image 0.5s ease;
+    }
+    .hero:hover .hero-bg { transform: scale(1); }
+    .hero-content { position: relative; z-index: 2; max-width: 800px; padding: 0 24px; animation: heroFadeUp 1s ease both; }
+    @keyframes heroFadeUp { from { opacity:0; transform:translateY(32px); } to { opacity:1; transform:translateY(0); } }
+    .hero-eyebrow { display: inline-flex; align-items: center; gap: 10px; background: rgba(201,168,76,0.18); border: 1px solid rgba(201,168,76,0.4); color: var(--gold-light); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; padding: 7px 20px; border-radius: 100px; margin-bottom: 22px; }
+    .hero-eyebrow::before, .hero-eyebrow::after { content: '✦'; font-size: 0.6em; opacity: 0.7; }
+    .hero-title { font-size: clamp(2.8rem, 7vw, 5.5rem); color: #fff; font-weight: 900; letter-spacing: -0.02em; margin-bottom: 12px; text-shadow: 0 4px 24px rgba(0,0,0,0.4); }
+    .hero-title em { color: var(--gold); font-style: italic; }
+    .hero-subtitle { font-size: clamp(1rem, 2.2vw, 1.3rem); color: rgba(255,255,255,0.85); margin-bottom: 12px; font-style: italic; font-family: 'Playfair Display', serif; }
+    .hero-tagline { font-size: 0.93rem; color: rgba(255,255,255,0.6); margin-bottom: 44px; }
+    .hero-stats { display: flex; justify-content: center; gap: 40px; margin-bottom: 44px; flex-wrap: wrap; }
+    .hero-stat { text-align: center; }
+    .hero-stat-num { font-family: 'Playfair Display', serif; font-size: 2.2rem; font-weight: 700; color: var(--gold); line-height: 1; }
+    .hero-stat-label { font-size: 0.72rem; color: rgba(255,255,255,0.55); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px; }
+    .hero-cta-group { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+    .btn-primary { background: var(--gold); color: var(--text-dark); font-size: 0.9rem; font-weight: 700; padding: 14px 32px; border-radius: 100px; letter-spacing: 0.03em; transition: background var(--transition), transform var(--transition), box-shadow var(--transition); box-shadow: 0 4px 20px rgba(201,168,76,0.4); }
+    .btn-primary:hover { background: var(--gold-light); transform: translateY(-2px); }
+    .btn-outline { background: transparent; color: #fff; font-size: 0.9rem; font-weight: 600; padding: 14px 32px; border-radius: 100px; border: 2px solid rgba(255,255,255,0.35); letter-spacing: 0.03em; transition: border-color var(--transition), background var(--transition), transform var(--transition); }
+    .btn-outline:hover { border-color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.1); transform: translateY(-2px); }
+    .hero-scroll { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; color: rgba(255,255,255,0.45); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; animation: bounce 2s ease infinite; }
+    @keyframes bounce { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(7px)} }
+
+    /* ============================================================
+       SECTIONS
+    ============================================================ */
+    .section { padding: 96px 0; }
+    .section-alt { background: var(--cream); }
+    .section-header { text-align: center; margin-bottom: 60px; }
+    .divider { width: 64px; height: 3px; background: linear-gradient(90deg, var(--burgundy), var(--gold)); border-radius: 2px; margin: 16px auto 20px; }
+
+    /* ============================================================
+       ITINERARY TABS
+    ============================================================ */
+    .itin-tabs { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 40px; }
+    .itin-tab { padding: 11px 28px; border-radius: 100px; font-size: 0.88rem; font-weight: 600; border: 2px solid transparent; transition: all var(--transition); color: var(--text-mid); background: var(--cream); }
+    .itin-tab:hover { border-color: var(--burgundy); color: var(--burgundy); }
+    .itin-tab.active { background: var(--burgundy); color: #fff; box-shadow: var(--shadow-md); border-color: var(--burgundy); }
+    .itin-panel { display: none; animation: fadeUp 0.35s ease both; }
+    .itin-panel.active { display: block; }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+
+    /* Overview card */
+    .itin-overview { background: #fff; border-radius: var(--radius-lg); box-shadow: var(--shadow-md); overflow: hidden; margin-bottom: 48px; display: grid; grid-template-columns: 1fr 1fr; }
+    @media (max-width: 768px) { .itin-overview { grid-template-columns: 1fr; } }
+    .itin-overview-img { position: relative; min-height: 320px; overflow: hidden; background: #c8c0b0; }
+    .itin-overview-img img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease; }
+    .itin-overview-img:hover img { transform: scale(1.04); }
+    .itin-overview-img-overlay { position: absolute; inset: 0; background: linear-gradient(135deg, rgba(139,26,26,0.45) 0%, transparent 60%); pointer-events: none; }
+    .itin-letter { position: absolute; top: 20px; left: 20px; width: 56px; height: 56px; background: var(--gold); color: var(--text-dark); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 900; box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
+    .itin-overview-body { padding: 36px 40px; display: flex; flex-direction: column; justify-content: center; }
+    @media (max-width: 768px) { .itin-overview-body { padding: 28px 24px; } }
+    .itin-overview-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .meta-chip { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: var(--radius-sm); font-size: 0.78rem; font-weight: 600; background: var(--cream); color: var(--text-mid); border: 1px solid rgba(0,0,0,0.07); }
+    .itin-overview-title { font-size: 1.7rem; color: var(--burgundy); margin-bottom: 6px; }
+    .itin-overview-tagline { font-size: 1rem; color: var(--text-light); font-style: italic; margin-bottom: 18px; }
+    .itin-overview-desc { font-size: 0.92rem; color: var(--text-mid); line-height: 1.75; margin-bottom: 22px; }
+    .itin-features { display: flex; flex-wrap: wrap; gap: 8px; }
+    .feature-tag { padding: 4px 12px; border-radius: 100px; font-size: 0.75rem; font-weight: 500; background: var(--gold-pale); color: var(--terracotta); border: 1px solid rgba(196,120,58,0.25); }
+
+    /* Stop cards */
+    .stops-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; }
+    .stop-card { background: #fff; border-radius: var(--radius-md); box-shadow: var(--shadow-sm); overflow: hidden; transition: transform var(--transition), box-shadow var(--transition); }
+    .stop-card:hover { transform: translateY(-6px); box-shadow: var(--shadow-lg); }
+    .stop-card-img { position: relative; height: 200px; overflow: hidden; background: linear-gradient(135deg,#2a3a2a,#3a2a1a); }
+    .stop-card-img img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.5s ease, transform 0.5s ease; }
+    .stop-card-img img.loaded { opacity: 1; }
+    .stop-card:hover .stop-card-img img { transform: scale(1.08); }
+    .stop-card-img-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(26,18,8,0.55) 0%, transparent 55%); pointer-events: none; }
+    .stop-nights-badge { position: absolute; top: 12px; right: 12px; background: var(--burgundy); color: #fff; font-size: 0.72rem; font-weight: 700; padding: 4px 10px; border-radius: 100px; letter-spacing: 0.04em; }
+    .stop-card-body { padding: 20px; }
+    .stop-card-name { font-size: 1.15rem; font-weight: 700; color: var(--text-dark); margin-bottom: 3px; }
+    .stop-card-region { font-size: 0.76rem; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 10px; }
+    .stop-card-desc { font-size: 0.85rem; color: var(--text-mid); line-height: 1.6; margin-bottom: 12px; }
+    .stop-highlights { display: flex; flex-direction: column; gap: 5px; }
+    .stop-highlight-item { display: flex; align-items: flex-start; gap: 7px; font-size: 0.8rem; color: var(--text-mid); }
+    .stop-highlight-item::before { content: '◆'; color: var(--gold); font-size: 0.5rem; margin-top: 5px; flex-shrink: 0; }
+
+    /* ============================================================
+       COMPARISON TABLE
+    ============================================================ */
+    .comparison-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); }
+    table.comparison-table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; }
+    .comparison-table thead th { padding: 20px 24px; text-align: left; }
+    .comparison-table thead .th-label { background: #2A3A3A; color: rgba(255,255,255,0.55); font-family: 'Inter', sans-serif; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; width: 200px; }
+    .comparison-table thead .th-a { background: var(--burgundy); color: #fff; font-family: 'Playfair Display', serif; font-size: 1rem; }
+    .comparison-table thead .th-b { background: var(--teal); color: #fff; font-family: 'Playfair Display', serif; font-size: 1rem; }
+    .comparison-table thead .th-c { background: var(--terracotta); color: #fff; font-family: 'Playfair Display', serif; font-size: 1rem; }
+    .comparison-table thead th small { display: block; font-family: 'Inter', sans-serif; font-size: 0.7rem; font-weight: 400; opacity: 0.75; margin-top: 3px; }
+    .comparison-table tbody tr { transition: background var(--transition); }
+    .comparison-table tbody tr:hover { background: var(--cream); }
+    .comparison-table tbody tr:not(:last-child) td { border-bottom: 1px solid rgba(0,0,0,0.05); }
+    .comparison-table tbody td { padding: 15px 24px; font-size: 0.87rem; }
+    .comparison-table tbody td:first-child { font-weight: 600; color: var(--text-mid); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; background: rgba(26,74,74,0.04); }
+    .cmp-stars { color: var(--gold); letter-spacing: 2px; }
+    .cmp-yes  { color: #2E9B4E; font-weight: 600; }
+    .cmp-no   { color: #C0392B; }
+    .cmp-part { color: var(--terracotta); }
+    .cmp-best { display: inline-block; background: var(--gold-pale); color: var(--terracotta); font-size: 0.65rem; font-weight: 700; padding: 2px 7px; border-radius: 100px; text-transform: uppercase; letter-spacing: 0.06em; margin-left: 5px; }
+
+    /* ============================================================
+       MAP SECTION
+    ============================================================ */
+    .map-section { padding: 96px 0; background: var(--teal); }
+    .map-section .section-title { color: var(--gold-light); }
+    .map-tabs { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 32px; }
+    .map-tab { padding: 10px 26px; border-radius: 100px; font-size: 0.85rem; font-weight: 600; border: 2px solid rgba(255,255,255,0.25); color: rgba(255,255,255,0.6); background: transparent; transition: all var(--transition); }
+    .map-tab:hover { border-color: var(--gold); color: var(--gold); }
+    .map-tab.active-a   { background: #C94848; border-color: #C94848; color: #fff; }
+    .map-tab.active-b   { background: #4A8FAA; border-color: #4A8FAA; color: #fff; }
+    .map-tab.active-c   { background: var(--terracotta); border-color: var(--terracotta); color: #fff; }
+    .map-tab.active-all { background: var(--gold); border-color: var(--gold); color: var(--text-dark); }
+    .map-container { border-radius: var(--radius-lg); overflow: hidden; box-shadow: 0 24px 80px rgba(0,0,0,0.4); height: 560px; }
+    #map { height: 100%; width: 100%; }
+    .map-legend { display: flex; gap: 28px; justify-content: center; flex-wrap: wrap; margin-top: 24px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; color: rgba(255,255,255,0.7); font-size: 0.82rem; }
+    .legend-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); flex-shrink: 0; }
+
+    /* Leaflet popup overrides */
+    .leaflet-popup-content-wrapper { border-radius: var(--radius-md) !important; box-shadow: var(--shadow-lg) !important; padding: 0 !important; overflow: hidden; min-width: 240px; }
+    .leaflet-popup-content { margin: 0 !important; width: auto !important; }
+    .leaflet-popup-tip-container { display: none; }
+    .map-popup { font-family: 'Inter', sans-serif; }
+    .map-popup-img { width: 100%; height: 130px; object-fit: cover; display: block; }
+    .map-popup-body { padding: 14px 16px; }
+    .map-popup-title { font-family: 'Playfair Display', serif; font-size: 1rem; font-weight: 700; color: var(--text-dark); margin-bottom: 2px; }
+    .map-popup-sub { font-size: 0.7rem; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 8px; }
+    .map-popup-desc { font-size: 0.8rem; color: var(--text-mid); line-height: 1.5; }
+    .map-popup-tags { margin-top: 10px; display: flex; gap: 5px; flex-wrap: wrap; }
+    .map-popup-tag { font-size: 0.65rem; font-weight: 600; padding: 2px 8px; border-radius: 100px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .tag-a { background: #FDDEDE; color: var(--burgundy); }
+    .tag-b { background: var(--teal-pale); color: var(--teal); }
+    .tag-c { background: #FDE8D4; color: var(--terracotta); }
+
+    /* ============================================================
+       TIPS SECTION
+    ============================================================ */
+    .tips-section { background: linear-gradient(135deg, var(--burgundy-dark) 0%, var(--burgundy) 60%, var(--burgundy-light) 100%); padding: 88px 0; }
+    .tips-section .section-title { color: var(--gold-light); }
+    .tips-section .section-subtitle { color: rgba(255,255,255,0.55); }
+    .tips-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px; }
+    .tip-card { text-align: center; padding: 28px 20px; border-radius: var(--radius-md); background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); transition: background var(--transition), transform var(--transition); }
+    .tip-card:hover { background: rgba(255,255,255,0.13); transform: translateY(-4px); }
+    .tip-icon { font-size: 2.2rem; margin-bottom: 14px; }
+    .tip-title { font-family: 'Playfair Display', serif; font-size: 1.05rem; color: var(--gold); margin-bottom: 8px; }
+    .tip-desc { font-size: 0.83rem; color: rgba(255,255,255,0.68); line-height: 1.65; }
+
+    /* ============================================================
+       FOOTER
+    ============================================================ */
+    .footer { background: var(--text-dark); padding: 48px 0 32px; }
+    .footer-inner { max-width: 1240px; margin: 0 auto; padding: 0 24px; display: flex; flex-direction: column; align-items: center; gap: 20px; text-align: center; }
+    .footer-logo { font-family: 'Playfair Display', serif; font-size: 1.4rem; color: var(--gold); }
+    .footer-links { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
+    .footer-link { font-size: 0.82rem; color: rgba(255,255,255,0.4); transition: color var(--transition); }
+    .footer-link:hover { color: var(--gold); }
+    .footer-copy { font-size: 0.76rem; color: rgba(255,255,255,0.22); }
+    .footer-heart { color: var(--burgundy-light); }
+
+    /* ============================================================
+       SCROLL FADE IN
+    ============================================================ */
+    .fade-in { opacity: 0; transform: translateY(24px); transition: opacity 0.55s ease, transform 0.55s ease; }
+    .fade-in.visible { opacity: 1; transform: none; }
+
+    /* ============================================================
+       RESPONSIVE
+    ============================================================ */
+    @media (max-width: 900px) { .section { padding: 64px 0; } }
+    @media (max-width: 640px) { .hero-stats{gap:24px} .hero-cta-group{flex-direction:column;align-items:center} .map-container{height:420px} }
+  </style>
+</head>
+<body>
+
+  <!-- NAVIGATION -->
+  <nav class="nav">
+    <div class="nav-inner">
+      <div class="nav-logo">Georgia <span>Trip Planner</span></div>
+      <div class="nav-links">
+        <a href="#itineraries" class="nav-link">Itineraries</a>
+        <a href="#compare"     class="nav-link">Compare</a>
+        <a href="#map-section" class="nav-link">Map</a>
+        <a href="#tips"        class="nav-link">Tips</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero" id="home">
+    <div class="hero-bg"></div>
+    <div class="hero-content">
+      <div class="hero-eyebrow">Caucasus Region</div>
+      <h1 class="hero-title">Discover<br><em>Georgia</em></h1>
+      <p class="hero-subtitle">Where ancient monasteries meet snow-capped peaks</p>
+      <p class="hero-tagline">Three handcrafted 2-week itineraries through Europe's hidden gem</p>
+      <div class="hero-stats">
+        <div class="hero-stat"><div class="hero-stat-num">3</div><div class="hero-stat-label">Itineraries</div></div>
+        <div class="hero-stat"><div class="hero-stat-num">14</div><div class="hero-stat-label">Days</div></div>
+        <div class="hero-stat"><div class="hero-stat-num">8+</div><div class="hero-stat-label">Destinations</div></div>
+        <div class="hero-stat"><div class="hero-stat-num">8K</div><div class="hero-stat-label">Yrs of Wine</div></div>
+      </div>
+      <div class="hero-cta-group">
+        <a href="#itineraries" class="btn-primary">Explore Itineraries</a>
+        <a href="#map-section"  class="btn-outline">View on Map</a>
+      </div>
+    </div>
+    <div class="hero-scroll" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+      Scroll
+    </div>
+  </section>
+
+  <!-- ITINERARIES -->
+  <section class="section" id="itineraries">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Choose Your Journey</h2>
+        <div class="divider"></div>
+        <p class="section-subtitle">Three distinct ways to experience Georgia's extraordinary diversity</p>
+      </div>
+
+      <div class="itin-tabs">
+        <button class="itin-tab active" data-panel="a">A — Classic Georgia</button>
+        <button class="itin-tab"        data-panel="b">B — Adventure &amp; Nature</button>
+        <button class="itin-tab"        data-panel="c">C — Culture, Wine &amp; Slow Travel</button>
+      </div>
+
+      <!-- PANEL A -->
+      <div class="itin-panel active" id="panel-a">
+        <div class="itin-overview fade-in">
+          <div class="itin-overview-img">
+              <img data-wiki="Tbilisi" alt="Tbilisi, Georgia" />
+            <div class="itin-overview-img-overlay"></div>
+            <div class="itin-letter">A</div>
+          </div>
+          <div class="itin-overview-body">
+            <div class="itin-overview-meta">
+              <span class="badge badge-easy">Easy Difficulty</span>
+              <span class="meta-chip">📅 14 Days</span>
+              <span class="meta-chip">📍 6 Stops</span>
+              <span class="meta-chip">💰 $900 – $1,400</span>
+            </div>
+            <h3 class="itin-overview-title">Classic Georgia</h3>
+            <p class="itin-overview-tagline">"The essential Georgian experience — capital to mountains to wine country"</p>
+            <p class="itin-overview-desc">The perfect first-time itinerary. Start in cosmopolitan Tbilisi, make a half-day pilgrimage to ancient Mtskheta, head west to Kutaisi and its medieval UNESCO monasteries, then ascend to the dramatic Kazbegi highlands before winding down through the vine-draped Kakheti region. A beautifully balanced mix of cities, culture, mountains, and wine.</p>
+            <div class="itin-features">
+              <span class="feature-tag">UNESCO Sites</span><span class="feature-tag">Wine Region</span><span class="feature-tag">Mountains</span><span class="feature-tag">Old Town</span><span class="feature-tag">Monasteries</span><span class="feature-tag">Day Hikes</span>
+            </div>
+          </div>
+        </div>
+        <div class="stops-grid">
+          <!-- Tbilisi: warm coloured city streetscape -->
+          <article class="stop-card fade-in">
+            <div class="stop-card-img">
+              <img data-wiki="Tbilisi" alt="Tbilisi" />
+              <div class="stop-card-img-overlay"></div><span class="stop-nights-badge">3 Nights</span>
+            </div>
+            <div class="stop-card-body">
+              <h4 class="stop-card-name">Tbilisi</h4>
+              <p class="stop-card-region">Capital City</p>
+              <p class="stop-card-desc">The vibrant capital where Persian-influenced balconies hang over sulfuric bath steam and modern wine bars thrive in the Old Town.</p>
+              <ul class="stop-highlights">
+                <li class="stop-highlight-item">Narikala Fortress &amp; Abanotubani baths</li>
+                <li class="stop-highlight-item">Old Town stroll &amp; Georgian cuisine</li>
+                <li class="stop-highlight-item">Dry Bridge antique market</li>
+              </ul>
+            </div>
+          </article>
+          <!-- Mtskheta: ancient church on a hill -->
+          <article class="stop-card fade-in">
+            <div class="stop-card-img">
+              <img data-wiki="Mtskheta" alt="Mtskheta" />
+              <div class="stop-card-img-overlay"></div><span class="stop-nights-badge">Day Trip</span>
+            </div>
+            <div class="stop-card-body">
+              <h4 class="stop-card-name">Mtskheta</h4>
+              <p class="stop-card-region">Ancient Capital — UNESCO</p>
+              <p class="stop-card-desc">Georgia's spiritual heart where the Mtkvari and Aragvi rivers meet beneath centuries-old fortified churches.</p>
+              <ul class="stop-highlights">
+                <li class="stop-highlight-item">Svetitskhoveli Cathedral (11th century)</li>
+                <li class="stop-highlight-item">Jvari Monastery — panoramic river views</li>
+                <li class="stop-highlight-item">Samtavro Nunnery</li>
+              </ul>
+            </div>
+          </article>
+          <!-- Kutaisi: lush western Georgia -->
+          <article class="stop-card fade-in">
+            <div class="stop-card-img">
+              <img data-wiki="Kutaisi" alt="Kutaisi" />
+              <div class="stop-card-img-overlay"></div><span class="stop-nights-badge">2 Nights</span>
+            </div>
+            <div class="stop-card-body">
+              <h4 class="stop-card-name">Kutaisi</h4>
+              <p class="stop-card-region">Western Georgia</p>
+              <p class="stop-card-desc">Georgia's ancient second city, gateway to lush forests, dramatic cave systems, and the medieval Gelati Monastery.</p>
+              <ul class="stop-highlights">
+                <li class="stop-highlight-item">Gelati Monastery — UNESCO World Heritage</li>
+                <li class="stop-highlight-item">Prometheus Cave &amp; Sataplia Nature Reserve</li>
+                <li class="stop-highlight-item">Bagrati Cathedral ruins</li>
+              </ul>
+            </div>
+          </article>
+          <!-- Kazbegi: dramatic mountain church -->
+          <article class="stop-card fade-in">
+            <div class="stop-card-img">
+              <img data-wiki="Stepantsminda" alt="Kazbegi" />
+              <div class="stop-card-img-overlay"></div><span class="stop-nights-badge">3 Nights</span>
+            </div>
+            <div class="stop-card-body">
+              <h4 class="stop-card-name">Kazbegi (Stepantsminda)</h4>
+              <p class="stop-card-region">Greater Caucasus</p>
+              <p class="stop-card-desc">The iconic mountain town beneath Mt. Kazbek (5,047 m), crowned by the legendary Gergeti Trinity Church perched at 2,170 m.</p>
+              <ul class="stop-highlights">
+                <li class="stop-highlight-item">Gergeti Trinity Church hike (2–3 hrs)</li>
+                <li class="stop-highlight-item">Georgian Military Highway &amp; Ananuri Fortress</li>
+                <li class="stop-highlight-item">Truso Valley gorge walk</li>
+              </ul>
+            </div>
+          </article>
+          <!-- Sighnaghi: vineyard hilltop town -->
+          <article class="stop-card fade-in">
+            <div class="stop-card-img">
+              <img data-wiki="Sighnaghi" alt="Sighnaghi" />
+              <div class="stop-card-img-overlay"></div><span class="stop-nights-badge">2 Nights</span>
+            </div>
+            <div class="stop-card-body">
+              <h4 class="stop-card-name">Sighnaghi</h4>
+              <p class="stop-card-region">Kakheti Wine Region</p>
+              <p class="stop-card-desc">Georgia's "City of Love" — a charming walled hilltop town surrounded by vineyards above the Alazani Valley plains.</p>
+              <ul class="stop-highlights">
+                <li class="stop-highlight-item">18th-century city walls &amp; watchtowers</li>
+                <li class="stop-highlight-item">Bodbe Monastery and nunnery</li>
+                <li class="stop-highlight-item">Local wine cellars &amp; qvevri tasting</li>
+              </ul>
+            </div>
+          </article>
+          <!-- Telavi: wine barrels / vineyard -->
+          <article class="stop-card fade-in">
+            <div class="stop-card-img">
+              <img data-wiki="Telavi" alt="Telavi" />
+              <div class="stop-card-img-overlay"></div><span class="stop-nights-badge">1 Night</span>
+            </div>
+            <div class="stop-card-body">
+              <h4 class="stop-card-name">Telavi</h4>
+              <p class="stop-card-region">Heart of Kakheti</p>
+              <p class="stop-card-desc">Capital of the Kakheti wine region, surrounded by medieval fortresses and Georgia's most celebrated wineries.</p>
+              <ul class="stop-highlights">
+                <li class="stop-highlight-item">Batonis Tsikhe fortress</li>
+                <li class="stop-highlight-item">Alaverdi Cathedral (11th century)</li>
+                <li class="stop-highlight-item">Family winery visits &amp; Nekresi Monastery</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </div><!-- /panel-a -->
+
+      <!-- PANEL B -->
+      <div class="itin-panel" id="panel-b">
+        <div class="itin-overview fade-in">
+          <div class="itin-overview-img">
+            <!-- Alpine mountain panorama -->
+            <img data-wiki="Mestia" alt="Svaneti mountains" />
+            <div class="itin-overview-img-overlay"></div>
+            <div class="itin-letter">B</div>
+          </div>
+          <div class="itin-overview-body">
+            <div class="itin-overview-meta">
+              <span class="badge badge-hard">Hard Difficulty</span>
+              <span class="meta-chip">📅 14 Days</span>
+              <span class="meta-chip">📍 4 Stops</span>
+              <span class="meta-chip">💰 $1,200 – $2,000</span>
+            </div>
+            <h3 class="itin-overview-title">Adventure &amp; Nature</h3>
+            <p class="itin-overview-tagline">"For trekkers and wilderness lovers — Georgia's raw, untamed highlands"</p>
+            <p class="itin-overview-desc">Georgia's most spectacular backcountry in 14 days. After one night in Tbilisi you head straight to Kazbegi for high-altitude acclimatisation, then journey to mystical Svaneti — the land of medieval towers — before trekking to remote Ushguli, one of Europe's highest inhabited settlements at 2,200 m. For physically fit, well-prepared travellers only.</p>
+            <div class="itin-features">
+              <span class="feature-tag">Multi-day Trekking</span><span class="feature-tag">Alpine Scenery</span><span class="feature-tag">Remote Villages</span><span class="feature-tag">Medieval Towers</span><span class="feature-tag">UNESCO Svaneti</span><span class="feature-tag">Glaciers</span>
+            </div>
+          </div>
+        </div>
+        <div class="stops-grid">
+          <article class="stop-card fade-in">
+            <div class="stop-card-img">
+              <img data-wiki="Tbilisi" alt="Tbilisi" />
+              <div class="stop-card-img-overlay"></div><span class="stop-nights-badge">1 Night</span>
+            </div>
+            <div class="stop-card-body">
+              <h4 class="stop-card-name">Tbilisi</h4>
+              <p class="stop-card-region">Capital — Arrival &amp; Gear Up</p>
+              <p class="stop-card-desc">Arrive, rest, and stock up on trail supplies. Book onward transport and a mountain guide for Kazbegi.</p>
+              <ul class="stop-highlights">
+                <li class="stop-highlight-item">Gear check &amp; supply run</li>
+                <li class="stop-highlight-item">Quick Old Town orientation walk</li>
+                <li class="stop-highlight-item">Pre-trek dinner at Fabrika district</li>
+              </ul>
+            </div>
+          </article>
+          <article class="stop-card fade-in">
+            <div class="stop-card-img">
+              <img data-wiki="Stepantsminda" alt="Kazbegi" />
+              <div class="stop-card-img-overlay"></div><span class="stop-nights-badge">3 Nights</span>
+            </div>
+            <div class="stop-card-body">
+              <h4 class="stop-card-name">Kazbegi (Stepantsminda)</h4>
+              <p class="stop-card-region">Greater Caucasus — 1,700 m</p>
+              <p class="stop-card-desc">Acclimatise at altitude before tackling Svaneti. The Gergeti glacier trek, Truso Valley gorge, and Dariali Canyon await.</p>
+              <ul class="stop-highlights">
+                <li class="stop-highlight-item">Gergeti Trinity Church hike</li>
+                <li class="stop-highlight-item">Truso Valley mineral springs gorge</li>
+                <li class="stop-highlight-item">Optional Gergeti Glacier full-day trek</li>
+              </ul>
+            </div>
+          </article>
+          <article class="stop-card fade-in">
+            <div class="stop-card-img">
+              <img data-wiki="Mestia" alt="Mestia, Svaneti" />
+              <div class="stop-card-img-overlay"></div><span class="stop-nights-badge">4 Nights</span>
+            </div>
+            <div class="stop-card-body">
+              <h4 class="stop-card-name">Mestia / Svaneti</h4>
+              <p class="stop-card-region">Upper Svaneti — UNESCO</p>
+              <p class="stop-card-desc">The Svaneti highlands capital, flanked by 9th–12th century defensive towers and surrounded by 4,000 m peaks.</p>
+              <ul class="stop-highlights">
+                <li class="stop-highlight-item">Koruldi Lakes day trek (6–7 hrs)</li>
+                <li class="stop-highlight-item">Chalaadi Glacier hike (4–5 hrs)</li>
+                <li class="stop-highlight-item">Svan towers &amp; local museum</li>
+              </ul>
+            </div>
+          </article>
+          <article class="stop-card fade-in">
+            <div class="stop-card-img">
+              <img data-wiki="Ushguli" alt="Ushguli" />
+              <div class="stop-card-img-overlay"></div><span class="stop-nights-badge">3 Nights</span>
+            </div>
+            <div class="stop-card-body">
+              <h4 class="stop-card-name">Ushguli</h4>
+              <p class="stop-card-region">Europe's Highest Village — 2,200 m</p>
+              <p class="stop-card-desc">Reached by a 2–3 day multi-stage trek from Mestia, Ushguli offers views of Mt. Shkhara (5,193 m).</p>
+              <ul class="stop-highlights">
+                <li class="stop-highlight-item">Mestia–Ushguli multi-day trek (58 km)</li>
+                <li class="stop-highlight-item">Shkhara glacier viewpoint</li>
+                <li class="stop-highlight-item">Lamaria Church ruins &amp; village walks</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </div><!-- /panel-b -->
+
+      <!-- PANEL C -->
+      <div class="itin-panel" id="panel-c">
+        <div class="itin-overview fade-in">
+          <div class="itin-overview-img">
+            <!-- Vineyard / wine country -->
+            <img data-wiki="Kakheti" alt="Kakheti wine country" />
+            <div class="itin-overview-img-overlay"></div>
+            <div class="itin-letter">C</div>
+          </div>
+          <div class="itin-overview-body">
+            <div class="itin-overview-meta">
+              <span class="badge badge-easy">Easy Difficulty</span>
+              <span class="meta-chip">📅 14 Days</span>
+              <span class="meta-chip">📍 5 Stops</span>
+              <span class="meta-chip">💰 $800 – $1,200</span>
+            </div>
+            <h3 class="itin-overview-title">Culture, Wine &amp; Slow Travel</h3>
+            <p class="itin-overview-tagline">"Breathe deeply, drink freely, let Georgia's history wash over you"</p>
+            <p class="itin-overview-desc">The anti-rush itinerary. Longer stays mean you can befriend a local winemaker, join a supra feast, wander monastery courtyards without rushing, and genuinely understand Georgia's 8,000-year wine culture. Ideal for food and culture lovers, couples, and anyone who despises over-scheduled travel.</p>
+            <div class="itin-features">
+              <span class="feature-tag">Wine Tasting</span><span class="feature-tag">Qvevri Cellars</span><span class="feature-tag">Supra Feast</span><span class="feature-tag">UNESCO Sites</span><span class="feature-tag">Monasteries</span><span class="feature-tag">Slow Pace</span>
+            </div>
+          </div>
+        </div>
+        <div class="stops-grid">
+          <article class="stop-card fade-in">
+            <div class="stop-card-img">
+              <img data-wiki="Tbilisi" alt="Tbilisi" />
+              <div class="stop-card-img-overlay"></div><span class="stop-nights-badge">4 Nights</span>
+            </div>
+            <div class="stop-card-body">
+              <h4 class="stop-card-name">Tbilisi</h4>
+              <p class="stop-card-region">Capital City</p>
+              <p class="stop-card-desc">Four full days to absorb Tbilisi at a leisurely pace — galleries, sulfur baths, natural wine bars, and neighbourhood wandering.</p>
+              <ul class="stop-highlights">
+                <li class="stop-highlight-item">Abanotubani sulfur bath ritual</li>
+                <li class="stop-highlight-item">Natural wine bars in Vake &amp; Vera</li>
+                <li class="stop-highlight-item">Georgian National Museum</li>
+              </ul>
+            </div>
+          </article>
+          <article class="stop-card fade-in">
+            <div class="stop-card-img">
+              <img data-wiki="Mtskheta" alt="Mtskheta" />
+              <div class="stop-card-img-overlay"></div><span class="stop-nights-badge">Day Trip</span>
+            </div>
+            <div class="stop-card-body">
+              <h4 class="stop-card-name">Mtskheta</h4>
+              <p class="stop-card-region">Ancient Capital — UNESCO</p>
+              <p class="stop-card-desc">Just 20 km from Tbilisi, Georgia's former capital packs sacred history into a deeply rewarding half-day excursion.</p>
+              <ul class="stop-highlights">
+                <li class="stop-highlight-item">Svetitskhoveli — Cathedral of the Living Pillar</li>
+                <li class="stop-highlight-item">Jvari Monastery on its cliff-edge perch</li>
+                <li class="stop-highlight-item">Traditional lunch in the old town</li>
+              </ul>
+            </div>
+          </article>
+          <article class="stop-card fade-in">
+            <div class="stop-card-img">
+              <img data-wiki="Kakheti" alt="Telavi & Kakheti" />
+              <div class="stop-card-img-overlay"></div><span class="stop-nights-badge">5 Nights</span>
+            </div>
+            <div class="stop-card-body">
+              <h4 class="stop-card-name">Telavi &amp; Kakheti</h4>
+              <p class="stop-card-region">The Wine Heartland</p>
+              <p class="stop-card-desc">Five nights to immerse yourself in Georgia's 8,000-year winemaking tradition — qvevri tastings, vineyard walks, and monastery stays.</p>
+              <ul class="stop-highlights">
+                <li class="stop-highlight-item">Qvevri winemaking cellar tours</li>
+                <li class="stop-highlight-item">Alaverdi &amp; Gremi monasteries</li>
+                <li class="stop-highlight-item">Traditional supra feast with local family</li>
+              </ul>
+            </div>
+          </article>
+          <article class="stop-card fade-in">
+            <div class="stop-card-img">
+              <img data-wiki="Sighnaghi" alt="Sighnaghi" />
+              <div class="stop-card-img-overlay"></div><span class="stop-nights-badge">2 Nights</span>
+            </div>
+            <div class="stop-card-body">
+              <h4 class="stop-card-name">Sighnaghi</h4>
+              <p class="stop-card-region">City of Love</p>
+              <p class="stop-card-desc">Charming, walkable, and utterly romantic — the hilltop city with cobblestone streets and sweeping vineyard panoramas.</p>
+              <ul class="stop-highlights">
+                <li class="stop-highlight-item">City walls sunset walk</li>
+                <li class="stop-highlight-item">Pheasant's Tears natural winery</li>
+                <li class="stop-highlight-item">Bodbe Monastery peaceful garden</li>
+              </ul>
+            </div>
+          </article>
+          <article class="stop-card fade-in">
+            <div class="stop-card-img">
+              <img data-wiki="Kutaisi" alt="Kutaisi" />
+              <div class="stop-card-img-overlay"></div><span class="stop-nights-badge">3 Nights</span>
+            </div>
+            <div class="stop-card-body">
+              <h4 class="stop-card-name">Kutaisi</h4>
+              <p class="stop-card-region">Ancient Western Georgia</p>
+              <p class="stop-card-desc">A relaxed finish in Georgia's oldest city — lush gorges, underground caves, ancient manuscripts, and excellent local food.</p>
+              <ul class="stop-highlights">
+                <li class="stop-highlight-item">Okatse Canyon &amp; Martvili Canyon</li>
+                <li class="stop-highlight-item">Gelati Monastery — UNESCO</li>
+                <li class="stop-highlight-item">Local market &amp; street food tour</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </div><!-- /panel-c -->
+
+    </div>
+  </section>
+
+  <!-- COMPARISON TABLE -->
+  <section class="section section-alt" id="compare">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Side-by-Side Comparison</h2>
+        <div class="divider"></div>
+        <p class="section-subtitle">Which itinerary is right for you?</p>
+      </div>
+      <div class="comparison-wrapper fade-in">
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th class="th-label">Category</th>
+              <th class="th-a">A — Classic Georgia<small>Balanced &amp; Essential</small></th>
+              <th class="th-b">B — Adventure &amp; Nature<small>Trekking &amp; Wild</small></th>
+              <th class="th-c">C — Culture, Wine &amp; Slow<small>Relaxed &amp; Deep</small></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Difficulty</td><td><span class="badge badge-easy">Easy</span></td><td><span class="badge badge-hard">Hard</span></td><td><span class="badge badge-easy">Easy</span></td></tr>
+            <tr><td>Budget (2 weeks)</td><td>$900 – $1,400<span class="cmp-best">Good Value</span></td><td>$1,200 – $2,000</td><td>$800 – $1,200<span class="cmp-best">Cheapest</span></td></tr>
+            <tr><td>Hiking Level</td><td><span class="cmp-stars">★★☆☆☆</span> Light</td><td><span class="cmp-stars">★★★★★</span> Intense<span class="cmp-best">Best</span></td><td><span class="cmp-stars">★☆☆☆☆</span> Minimal</td></tr>
+            <tr><td>Mountain Scenery</td><td><span class="cmp-yes">✔</span> Kazbegi (superb)</td><td><span class="cmp-yes">✔</span> Kazbegi + Svaneti<span class="cmp-best">Best</span></td><td><span class="cmp-no">✖</span> Minimal</td></tr>
+            <tr><td>UNESCO Sites</td><td><span class="cmp-yes">✔</span> 4–5 sites</td><td><span class="cmp-part">◑</span> 1–2 sites</td><td><span class="cmp-yes">✔</span> 4–5 sites<span class="cmp-best">Most</span></td></tr>
+            <tr><td>Wine &amp; Food</td><td><span class="cmp-part">◑</span> Good (Kakheti days)</td><td><span class="cmp-no">✖</span> Limited in mountains</td><td><span class="cmp-yes">✔</span> Exceptional<span class="cmp-best">Best</span></td></tr>
+            <tr><td>Monasteries</td><td><span class="cmp-yes">✔</span> 6+ visits<span class="cmp-best">Most</span></td><td><span class="cmp-part">◑</span> 2–3 visits</td><td><span class="cmp-yes">✔</span> 5+ visits (in-depth)</td></tr>
+            <tr><td>Physical Fitness</td><td>Average — some day hikes</td><td>High — multi-day altitude treks</td><td>Low — mostly walking</td></tr>
+            <tr><td>Best Season</td><td>Apr–Jun, Sep–Oct</td><td>Jun–Sep only</td><td>Apr–Nov<span class="cmp-best">Widest</span></td></tr>
+            <tr><td>Transport Needed</td><td>Car or marshrutka</td><td>4WD + trekking + guide</td><td>Car or marshrutka</td></tr>
+            <tr><td>Pace</td><td>Moderate (frequent moves)</td><td>Active (base camps)</td><td>Leisurely (slow stays)</td></tr>
+            <tr><td>Best For</td><td>First-timers, couples, solo</td><td>Fit hikers, adventurers</td><td>Wine lovers, culture fans</td></tr>
+            <tr><td>Overall Verdict</td><td>The quintessential Georgian experience</td><td>Georgia's most dramatic landscapes</td><td>Georgia's soul — slow &amp; savoured</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- MAP -->
+  <section class="map-section" id="map-section">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Interactive Route Map</h2>
+        <div class="divider" style="background:linear-gradient(90deg,var(--gold),rgba(201,168,76,0.3))"></div>
+        <p class="section-subtitle" style="color:rgba(255,255,255,0.55)">Toggle itineraries to see routes — click any marker for details</p>
+      </div>
+      <div class="map-tabs">
+        <button class="map-tab active-a" data-itin="a">A — Classic</button>
+        <button class="map-tab"          data-itin="b">B — Adventure</button>
+        <button class="map-tab"          data-itin="c">C — Culture &amp; Wine</button>
+        <button class="map-tab"          data-itin="all">All Routes</button>
+      </div>
+      <div class="map-container"><div id="map"></div></div>
+      <div class="map-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#C94848"></div> Itinerary A — Classic</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#4A8FAA"></div> Itinerary B — Adventure</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#C47A3A"></div> Itinerary C — Culture &amp; Wine</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TIPS -->
+  <section class="tips-section" id="tips">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Practical Travel Tips</h2>
+        <div class="divider" style="background:linear-gradient(90deg,var(--gold),rgba(201,168,76,0.3))"></div>
+        <p class="section-subtitle">Everything you need to know before you go</p>
+      </div>
+      <div class="tips-grid">
+        <div class="tip-card fade-in"><div class="tip-icon">✈️</div><h3 class="tip-title">Getting There</h3><p class="tip-desc">Tbilisi International Airport (TBS) has direct flights from most European hubs, Istanbul, Dubai, and Yerevan. Low-cost airlines like Wizzair and Ryanair operate seasonal routes.</p></div>
+        <div class="tip-card fade-in"><div class="tip-icon">🛂</div><h3 class="tip-title">Visa</h3><p class="tip-desc">Citizens of 95+ countries including EU, US, UK, Canada, and Australia receive a free 1-year visa on arrival. No advance booking needed — just show your passport.</p></div>
+        <div class="tip-card fade-in"><div class="tip-icon">💴</div><h3 class="tip-title">Currency</h3><p class="tip-desc">Georgian Lari (GEL). 1 USD ≈ 2.7 GEL. ATMs are widespread in cities; rural areas are cash-only. Georgia is extremely affordable by European standards.</p></div>
+        <div class="tip-card fade-in"><div class="tip-icon">🚐</div><h3 class="tip-title">Getting Around</h3><p class="tip-desc">Marshrutkas (shared minibuses) connect all major towns cheaply. Bolt app works great in Tbilisi. Rent a car for Kakheti freedom. 4WD needed for Svaneti.</p></div>
+        <div class="tip-card fade-in"><div class="tip-icon">🍷</div><h3 class="tip-title">Food &amp; Wine</h3><p class="tip-desc">Try khinkali (dumplings), khachapuri (cheese bread), churchkhela, and natural orange wine from 8,000-year-old qvevri clay vessels. Georgia is the cradle of wine.</p></div>
+        <div class="tip-card fade-in"><div class="tip-icon">📅</div><h3 class="tip-title">Best Time to Visit</h3><p class="tip-desc">May–June and September–October are ideal. Summer is fine but hot in cities. Mountain passes close November to May. Kakheti harvest is late September.</p></div>
+        <div class="tip-card fade-in"><div class="tip-icon">📶</div><h3 class="tip-title">Connectivity</h3><p class="tip-desc">Buy a Magti or Geocell SIM at the airport for ~$5 with generous 4G data. Wi-Fi is reliable in guesthouses and cafes. Mountain regions have limited signal.</p></div>
+        <div class="tip-card fade-in"><div class="tip-icon">🙏</div><h3 class="tip-title">Culture &amp; Etiquette</h3><p class="tip-desc">Cover shoulders and knees in churches. Always accept a supra feast invitation. Georgians are famously hospitable — a kind word goes a very long way.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-logo">Georgia Trip Planner</div>
+      <nav class="footer-links">
+        <a href="#home"         class="footer-link">Home</a>
+        <a href="#itineraries"  class="footer-link">Itineraries</a>
+        <a href="#compare"      class="footer-link">Compare</a>
+        <a href="#map-section"  class="footer-link">Map</a>
+        <a href="#tips"         class="footer-link">Tips</a>
+      </nav>
+      <p class="footer-copy">Made with <span class="footer-heart">♥</span> for travellers exploring the Caucasus. Photos via Picsum · Map © OpenStreetMap contributors · Tiles © CARTO</p>
+    </div>
+  </footer>
+
+  <!-- LEAFLET JS (no integrity hash) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+  /* ============================================================
+     WIKIPEDIA IMAGE CACHE
+     Fetches the lead thumbnail for any Wikipedia page title.
+     Results are cached so each page is only fetched once.
+  ============================================================ */
+  var wikiCache = {}; // title → image URL string (or '' on failure)
+
+  function fetchWikiImg(title, callback) {
+    if (wikiCache[title] !== undefined) { callback(wikiCache[title]); return; }
+    var url = 'https://en.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(title);
+    fetch(url)
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        var img = (data.thumbnail && data.thumbnail.source) ? data.thumbnail.source : '';
+        // Request a larger version — replace /320px- with /800px-
+        img = img.replace(/\/\d+px-/, '/800px-');
+        wikiCache[title] = img;
+        callback(img);
+      })
+      .catch(function(){ wikiCache[title] = ''; callback(''); });
+  }
+
+  /* Apply Wikipedia images to all [data-wiki] <img> elements inside a container */
+  function loadWikiImages(container) {
+    container.querySelectorAll('img[data-wiki]').forEach(function(img) {
+      var title = img.dataset.wiki;
+      img.removeAttribute('data-wiki');
+      fetchWikiImg(title, function(src) {
+        if (src) {
+          img.src = src;
+          img.addEventListener('load',  function(){ img.classList.add('loaded'); });
+          img.addEventListener('error', function(){ img.classList.add('loaded'); });
+        } else {
+          img.classList.add('loaded'); // show placeholder gradient
+        }
+      });
+    });
+  }
+
+  /* ============================================================
+     ITINERARY TAB SWITCHER
+  ============================================================ */
+  (function () {
+    var tabs   = document.querySelectorAll('.itin-tab');
+    var panels = document.querySelectorAll('.itin-panel');
+    tabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        tabs.forEach(function (t) { t.classList.remove('active'); });
+        panels.forEach(function (p) { p.classList.remove('active'); });
+        tab.classList.add('active');
+        var el = document.getElementById('panel-' + tab.dataset.panel);
+        if (el) {
+          el.classList.add('active');
+          loadWikiImages(el);
+        }
+      });
+    });
+  }());
+
+  // Load panel-a images on page start
+  loadWikiImages(document.getElementById('panel-a'));
+
+  // Set hero background to the real Kazbegi / Gergeti church photo from Wikipedia
+  fetchWikiImg('Gergeti Trinity Church', function(src) {
+    if (!src) return;
+    src = src.replace(/\/\d+px-/, '/1600px-');
+    var heroBg = document.querySelector('.hero-bg');
+    if (heroBg) {
+      heroBg.style.backgroundImage =
+        'linear-gradient(to bottom, rgba(26,18,8,0.35) 0%, rgba(139,26,26,0.5) 50%, rgba(26,18,8,0.8) 100%), url("' + src + '")';
+    }
+  });
+
+  /* ============================================================
+     MAP
+  ============================================================ */
+  (function () {
+    if (typeof L === 'undefined') {
+      document.getElementById('map').innerHTML =
+        '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#fff;font-family:serif;font-size:1.1rem;background:#1A4A4A;">Map could not load — check your internet connection.</div>';
+      return;
+    }
+
+    /* Stop data — Wikipedia page titles used for popup images */
+    var stops = {
+      tbilisi:   { name:'Tbilisi',                  region:'Capital City',               lat:41.7151, lng:44.8271, wiki:'Tbilisi',        desc:'Vibrant capital with sulfuric baths, Persian-influenced balconies, and a thriving food scene.',                         itins:['a','b','c'] },
+      mtskheta:  { name:'Mtskheta',                 region:'Ancient Capital — UNESCO',   lat:41.8423, lng:44.7210, wiki:'Mtskheta',       desc:'Georgia\'s spiritual heart — Svetitskhoveli Cathedral and Jvari Monastery at the rivers\' confluence.',              itins:['a','c']     },
+      kutaisi:   { name:'Kutaisi',                  region:'Western Georgia',             lat:42.2972, lng:42.7611, wiki:'Kutaisi',        desc:'Georgia\'s ancient second city — Gelati Monastery (UNESCO) and spectacular Prometheus Caves.',                        itins:['a','c']     },
+      kazbegi:   { name:'Kazbegi (Stepantsminda)',   region:'Greater Caucasus',           lat:42.5547, lng:44.6036, wiki:'Stepantsminda',  desc:'Iconic mountain town beneath Mt. Kazbek (5,047 m), crowned by the legendary Gergeti Trinity Church.',                itins:['a','b']     },
+      sighnaghi: { name:'Sighnaghi',                region:'Kakheti Wine Region',         lat:41.8833, lng:45.7333, wiki:'Sighnaghi',      desc:'Georgia\'s "City of Love" — a walled hilltop town surrounded by vineyards above the Alazani Valley.',              itins:['a','c']     },
+      telavi:    { name:'Telavi',                   region:'Heart of Kakheti',            lat:41.9167, lng:45.4833, wiki:'Telavi',         desc:'Capital of the Kakheti wine region, home to Georgia\'s finest wineries and medieval fortresses.',                    itins:['a','c']     },
+      mestia:    { name:'Mestia / Svaneti',          region:'Upper Svaneti — UNESCO',     lat:43.0016, lng:42.7398, wiki:'Mestia',         desc:'The Svaneti highlands capital, flanked by medieval defensive towers and 4,000 m peaks.',                             itins:['b']         },
+      ushguli:   { name:'Ushguli',                  region:"Europe's Highest Village",    lat:42.9511, lng:43.0156, wiki:'Ushguli',        desc:'Remote highland village at 2,200 m with views of Mt. Shkhara (5,193 m). Europe\'s highest settlement.',              itins:['b']         }
+    };
+
+    var routes = {
+      a: ['tbilisi','mtskheta','kutaisi','kazbegi','sighnaghi','telavi','tbilisi'],
+      b: ['tbilisi','kazbegi','mestia','ushguli'],
+      c: ['tbilisi','mtskheta','telavi','sighnaghi','kutaisi']
+    };
+    var colors = { a:'#C94848', b:'#4A8FAA', c:'#C47A3A' };
+
+    var map = L.map('map', { center:[42.0, 43.6], zoom:7 });
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains:'abcd', maxZoom:19
+    }).addTo(map);
+
+    /* SVG marker icons */
+    function makeIcon(color, letter) {
+      var svg = [
+        '<svg xmlns="http://www.w3.org/2000/svg" width="34" height="44" viewBox="0 0 34 44">',
+        '<defs><filter id="sh"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.3"/></filter></defs>',
+        '<path d="M17 1C9.8 1 4 6.8 4 14c0 9.5 13 29 13 29s13-19.5 13-29C30 6.8 24.2 1 17 1z" fill="',color,'" filter="url(#sh)"/>',
+        '<circle cx="17" cy="14" r="7" fill="white" opacity="0.92"/>',
+        '<text x="17" y="18.5" text-anchor="middle" font-family="Georgia,serif" font-size="9" font-weight="bold" fill="',color,'">',letter,'</text>',
+        '</svg>'
+      ].join('');
+      return L.divIcon({ html:svg, className:'', iconSize:[34,44], iconAnchor:[17,44], popupAnchor:[0,-42] });
+    }
+
+    var icons = {
+      a: makeIcon(colors.a, 'A'),
+      b: makeIcon(colors.b, 'B'),
+      c: makeIcon(colors.c, 'C'),
+      multi: makeIcon('#7055A0', '★')
+    };
+
+    function buildPopup(stop) {
+      var tags = stop.itins.map(function(i){
+        return '<span class="map-popup-tag tag-'+i+'">Itinerary '+i.toUpperCase()+'</span>';
+      }).join('');
+      // Use a placeholder div that gets filled once the Wikipedia fetch resolves
+      var imgId = 'popup-img-' + stop.wiki;
+      var html = '<div class="map-popup">'
+        + '<img class="map-popup-img" id="'+imgId+'" src="" alt="'+stop.name+'" style="background:#2a3a2a;">'
+        + '<div class="map-popup-body">'
+        + '<div class="map-popup-title">'+stop.name+'</div>'
+        + '<div class="map-popup-sub">'+stop.region+'</div>'
+        + '<div class="map-popup-desc">'+stop.desc+'</div>'
+        + '<div class="map-popup-tags">'+tags+'</div>'
+        + '</div></div>';
+      // Fetch and fill the image (uses cache after first load)
+      fetchWikiImg(stop.wiki, function(src) {
+        if (!src) return;
+        // Replace /800px- with /320px- for compact popup size
+        src = src.replace(/\/\d+px-/, '/320px-');
+        var el = document.getElementById(imgId);
+        if (el) el.src = src;
+      });
+      return html;
+    }
+
+    /* Pre-built layer lists */
+    var markerGroups = { a:[], b:[], c:[] };
+    var polylines    = {};
+
+    Object.keys(stops).forEach(function(key) {
+      stops[key].itins.forEach(function(itin) {
+        var s = stops[key];
+        markerGroups[itin].push(
+          L.marker([s.lat, s.lng], { icon: icons[itin] })
+           .bindPopup(buildPopup(s), { maxWidth:280 })
+        );
+      });
+    });
+
+    ['a','b','c'].forEach(function(itin) {
+      var latlngs = routes[itin].map(function(k){ return [stops[k].lat, stops[k].lng]; });
+      polylines[itin] = L.polyline(latlngs, { color:colors[itin], weight:4, opacity:0.8, smoothFactor:1.5 });
+    });
+
+    var activeLayers = [];
+    function clearMap() { activeLayers.forEach(function(l){ map.removeLayer(l); }); activeLayers = []; }
+
+    function render(itin) {
+      clearMap();
+      if (itin === 'all') {
+        ['a','b','c'].forEach(function(i){ polylines[i].addTo(map); activeLayers.push(polylines[i]); });
+        var seen = {};
+        ['a','b','c'].forEach(function(i) {
+          routes[i].forEach(function(key) {
+            if (seen[key]) return; seen[key] = true;
+            var s = stops[key];
+            var icon = s.itins.length > 1 ? icons.multi : icons[s.itins[0]];
+            var m = L.marker([s.lat, s.lng], { icon:icon }).bindPopup(buildPopup(s), { maxWidth:280 });
+            m.addTo(map); activeLayers.push(m);
+          });
+        });
+      } else {
+        polylines[itin].addTo(map); activeLayers.push(polylines[itin]);
+        markerGroups[itin].forEach(function(m){ m.addTo(map); activeLayers.push(m); });
+      }
+    }
+
+    render('a');
+
+    document.querySelectorAll('.map-tab').forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        var itin = tab.dataset.itin;
+        document.querySelectorAll('.map-tab').forEach(function(t){
+          t.className = 'map-tab';
+        });
+        tab.classList.add('active-' + itin);
+        render(itin);
+      });
+    });
+  }());
+
+  /* ============================================================
+     INTERSECTION OBSERVER — scroll fade-in
+  ============================================================ */
+  (function () {
+    if (!('IntersectionObserver' in window)) {
+      document.querySelectorAll('.fade-in').forEach(function(el){ el.classList.add('visible'); });
+      return;
+    }
+    var io = new IntersectionObserver(function(entries) {
+      entries.forEach(function(e) {
+        if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.08 });
+    document.querySelectorAll('.fade-in').forEach(function(el){ io.observe(el); });
+  }());
+  </script>
+</body>
+</html>
